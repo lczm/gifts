@@ -19,17 +19,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type MappingEntry struct {
-	StaffPassID string    `json:"staff_pass_id" gorm:"primaryKey"`
-	TeamName    string    `json:"team_name"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type RedemptionEntry struct {
-	TeamName   string    `json:"team_name" gorm:"primaryKey"`
-	RedeemedAt time.Time `json:"redeemed_at"`
-}
-
 type GiftRedemptionSystem struct {
 	db *gorm.DB
 }
@@ -39,13 +28,6 @@ func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Reque
 
 func (g *GiftRedemptionSystem) handleRedemption(w http.ResponseWriter, r *http.Request) {
 
-}
-
-func initDB(db *gorm.DB) error {
-	if err := db.AutoMigrate(&MappingEntry{}, &RedemptionEntry{}); err != nil {
-		return fmt.Errorf("error initializing database tables: %w", err)
-	}
-	return nil
 }
 
 func loadCsvMapping(db *gorm.DB, filePath string) error {
