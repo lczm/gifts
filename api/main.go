@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,6 +25,20 @@ type GiftRedemptionSystem struct {
 }
 
 func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Request) {
+	staffPassID := r.URL.Query().Get("staff_pass_id")
+	// if query param does not include staff_pass_id, then nothing to look up
+	if staffPassID == "" {
+		http.Error(w, "staff_pass_id is needed to lookup redemption", http.StatusBadRequest)
+		return
+	}
+
+	mapping, err := GetStaffPass(g.db, staffPassID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mapping)
 }
 
 func (g *GiftRedemptionSystem) handleRedemption(w http.ResponseWriter, r *http.Request) {
