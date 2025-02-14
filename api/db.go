@@ -23,22 +23,23 @@ func GetStaffPass(db *gorm.DB, staffPassID string) (MappingEntry, error) {
 	return mapping, nil
 }
 
-func CheckCanRedeem(db *gorm.DB, teamName string) (bool, error) {
+func CheckCanRedeem(db *gorm.DB, teamName string) (RedemptionEntry, error) {
 	var redemption RedemptionEntry
 	if err := db.First(&redemption, "team_name = ?", teamName).Error; err != nil {
 		// if the record is not found, then the team has not redeemed
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return true, nil
+			return RedemptionEntry{}, nil
 		}
-		return false, err
+		return RedemptionEntry{}, err
 	}
-	return false, nil
+	return redemption, nil
 }
 
-func InsertRedemption(db *gorm.DB, teamName string) (RedemptionEntry, error) {
+func InsertRedemption(db *gorm.DB, teamName string, staffPassID string) (RedemptionEntry, error) {
 	redemption := RedemptionEntry{
 		TeamName:   teamName,
 		RedeemedAt: time.Now(),
+		RedeemedBy: staffPassID,
 	}
 
 	// open a transaction to prevent multiple writers to the same row
@@ -46,7 +47,7 @@ func InsertRedemption(db *gorm.DB, teamName string) (RedemptionEntry, error) {
 		// once a transaction opened, check for existing redemption
 		var existing RedemptionEntry
 		if err := tx.First(&existing, "team_name = ?", teamName).Error; err == nil {
-			return fmt.Errorf("team '%s' has already redeemed their gift", teamName)
+			return fmt.Errorf("%s from team '%s' has already redeemed their gift", existing.RedeemedBy, teamName)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}

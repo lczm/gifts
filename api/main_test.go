@@ -82,26 +82,26 @@ func TestSequentialCheckCanRedeem(t *testing.T) {
 	system := getTestSystem(t)
 
 	// successful case, this will pass
-	canRedeem, err := CheckCanRedeem(system.db, "BASS")
+	redemptionEntry, err := CheckCanRedeem(system.db, "BASS")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !canRedeem {
-		t.Fatalf("expected BASS to be able to redeem, got false")
+	if redemptionEntry.TeamName != "" {
+		t.Fatalf("expected no redemption for BASS, got %s", redemptionEntry.TeamName)
 	}
 
 	// unsuccessful case, this wont pass, the team has already redeemed
-	_, err = InsertRedemption(system.db, "BASS")
+	_, err = InsertRedemption(system.db, "BASS", "STAFF_H123804820G")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	canRedeem, err = CheckCanRedeem(system.db, "BASS")
+	redemptionEntry, err = CheckCanRedeem(system.db, "BASS")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if canRedeem {
-		t.Fatalf("expected BASS to not be able to redeem, got true")
+	if redemptionEntry.TeamName == "" {
+		t.Fatalf("expected redemption entry for BASS, got empty team name")
 	}
 }
 
@@ -118,7 +118,7 @@ func TestConcurrentCheckCanRedeem(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// db transactions will handle the concurrency
-			_, err := InsertRedemption(system.db, "RUST")
+			_, err := InsertRedemption(system.db, "RUST", "MANAGER_T999888420B")
 			// safely increment count
 			if err == nil {
 				mu.Lock()

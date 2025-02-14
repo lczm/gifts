@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -24,17 +25,26 @@ type GiftRedemptionSystem struct {
 	db *gorm.DB
 }
 
+// use a standard format for all errors
+func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": message,
+	})
+}
+
 func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Request) {
 	staffPassID := r.URL.Query().Get("staff_pass_id")
 	// if query param does not include staff_pass_id, then nothing to look up
 	if staffPassID == "" {
-		http.Error(w, "staff_pass_id is needed to lookup redemption", http.StatusBadRequest)
+		writeJSONError(w, "staff_pass_id is needed to lookup redemption", http.StatusBadRequest)
 		return
 	}
 
 	mapping, err := GetStaffPass(g.db, staffPassID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeJSONError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -45,33 +55,37 @@ func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Reque
 func (g *GiftRedemptionSystem) handleRedemption(w http.ResponseWriter, r *http.Request) {
 	var redemptionPayload RedemptionPayload
 	if err := json.NewDecoder(r.Body).Decode(&redemptionPayload); err != nil {
-		http.Error(w, "invalid request payload to redeem gift", http.StatusBadRequest)
+		writeJSONError(w, "invalid request payload to redeem gift", http.StatusBadRequest)
 		return
 	}
 
 	// get the staff mapping
 	mapping, err := GetStaffPass(g.db, redemptionPayload.StaffPassID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeJSONError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	canRedeem, err := CheckCanRedeem(g.db, mapping.TeamName)
+	redemptionEntry, err := CheckCanRedeem(g.db, mapping.TeamName)
 	// general error, not related to redemption
 	if err != nil {
-		http.Error(w, "error retrieving redemption status", http.StatusInternalServerError)
+		writeJSONError(w, "error retrieving redemption status", http.StatusInternalServerError)
 		return
 	}
-	// check specifically for the case that cannot be redeemed
-	if !canRedeem {
-		http.Error(w, fmt.Sprintf("%s has already claimed the gift", mapping.TeamName), http.StatusBadRequest)
+	// if TeamName is not empty, it means a redemption exists
+	if redemptionEntry.TeamName != "" {
+		writeJSONError(w, fmt.Sprintf("%s from team %s has already claimed the gift on %s",
+			redemptionEntry.RedeemedBy,
+			mapping.TeamName,
+			redemptionEntry.RedeemedAt.Format("2006-01-02 15:04:05")),
+			http.StatusBadRequest)
 		return
 	}
 
 	// this team representative can redeem the gift, try to redeem the gift
-	redemption, err := InsertRedemption(g.db, mapping.TeamName)
+	redemption, err := InsertRedemption(g.db, mapping.TeamName, mapping.StaffPassID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSONError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -168,6 +182,11 @@ func main() {
 	// router services
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type"},
+	}))
 	r.Get("/lookup", system.handleLookup)
 	r.Post("/redemption", system.handleRedemption)
 	http.ListenAndServe(":3000", r)

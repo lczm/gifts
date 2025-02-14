@@ -13,6 +13,7 @@ type MappingEntry struct {
 type RedemptionEntry struct {
 	TeamName   string    `json:"team_name" gorm:"primaryKey"`
 	RedeemedAt time.Time `json:"redeemed_at"`
+	RedeemedBy string    `json:"redeemed_by"`
 }
 
 // post request payload body
