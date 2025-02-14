@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -48,7 +49,7 @@ func getTestRouter(t *testing.T) *chi.Mux {
 	system := getTestSystem(t)
 	r := chi.NewRouter()
 	r.Get("/lookup", system.handleLookup)
-	r.Post("/redeem", system.handleRedemption)
+	r.Post("/redemption", system.handleRedemption)
 	return r
 }
 
@@ -163,5 +164,41 @@ func TestLookupEndpointEmptyStaffQuery(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400 for empty staff_pass_id, got %d", rec.Code)
+	}
+}
+
+func TestRedemptionEndpoint(t *testing.T) {
+	router := getTestRouter(t)
+
+	redeemReq := RedemptionPayload{
+		StaffPassID: "MANAGER_T999888420B",
+	}
+	body, err := json.Marshal(redeemReq)
+	if err != nil {
+		t.Fatalf("error marshalling JSON: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/redemption", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var redemption RedemptionEntry
+	if err := json.Unmarshal(rec.Body.Bytes(), &redemption); err != nil {
+		t.Fatalf("error unmarshalling response: %v", err)
+	}
+	if redemption.TeamName != "RUST" {
+		t.Fatalf("expected team RUST, got %s", redemption.TeamName)
+	}
+
+	// try to redeem again, this should fail
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req)
+	if rec2.Code == http.StatusOK {
+		t.Fatalf("expected second redemption to fail, got status %d", rec2.Code)
 	}
 }
