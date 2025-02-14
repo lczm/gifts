@@ -93,7 +93,7 @@ func TestLookupEndpoint(t *testing.T) {
 	}
 }
 
-func TestLookupEndpoint_EmptyStaffQuery(t *testing.T) {
+func TestLookupEndpointEmptyStaffQuery(t *testing.T) {
 	router := getTestRouter(t)
 	// create a request (that will fail) because there was no staff pass id
 	req := httptest.NewRequest(http.MethodGet, "/lookup", nil)
