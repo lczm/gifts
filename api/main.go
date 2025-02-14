@@ -35,6 +35,7 @@ func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Reque
 	mapping, err := GetStaffPass(g.db, staffPassID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -42,7 +43,40 @@ func (g *GiftRedemptionSystem) handleLookup(w http.ResponseWriter, r *http.Reque
 }
 
 func (g *GiftRedemptionSystem) handleRedemption(w http.ResponseWriter, r *http.Request) {
+	var redemptionPayload RedemptionPayload
+	if err := json.NewDecoder(r.Body).Decode(&redemptionPayload); err != nil {
+		http.Error(w, "invalid request payload to redeem gift", http.StatusBadRequest)
+		return
+	}
 
+	// get the staff mapping
+	mapping, err := GetStaffPass(g.db, redemptionPayload.StaffPassID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	canRedeem, err := CheckCanRedeem(g.db, mapping.TeamName)
+	// general error, not related to redemption
+	if err != nil {
+		http.Error(w, "error retrieving redemption status", http.StatusInternalServerError)
+		return
+	}
+	// check specifically for the case that cannot be redeemed
+	if !canRedeem {
+		http.Error(w, fmt.Sprintf("%s has already claimed the gift", mapping.TeamName), http.StatusBadRequest)
+		return
+	}
+
+	// this team representative can redeem the gift, try to redeem the gift
+	redemption, err := InsertRedemption(g.db, mapping.TeamName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(redemption)
 }
 
 func loadCsvMapping(db *gorm.DB, filePath string) error {
