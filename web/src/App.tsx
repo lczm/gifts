@@ -82,7 +82,7 @@ function App() {
         <Stack spacing={2} direction="column">
           <Stack direction="row" justifyContent="flex-end">
             <Tooltip
-              title="The backend hosting this for convenience is using 'staff-id-to-team-mapping-long.csv', so any staff pass ID in that file can be used to test."
+              title="The backend hosting this for convenience is using 'staff-id-to-team-mapping-long.csv', so any staff pass ID in that file can be used to test. But this can be ran locally as well. The API path is set in the .env file"
               placement="top"
             >
               <IconButton size="small">
